@@ -65,6 +65,33 @@ list.addEventListener("dragleave", (e) => {
   dragtl.reverse();
 });
 
+document.querySelector(".btn-upload").addEventListener("click", () => {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.multiple = true;
+  fileInput.accept = "image/*";
+  fileInput.style.display = "none";
+
+  fileInput.addEventListener("change", (e) => {
+    const files = e.target.files;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.addEventListener("load", () => {
+        const offsetX = window.innerWidth / 2;
+        const offsetY = window.innerHeight / 2;
+        itemMarkup(file, reader.result, offsetX, offsetY);
+        updateButtonState(); // 이미지 업로드 후 버튼 상태 업데이트
+      });
+    });
+  });
+
+  document.body.appendChild(fileInput);
+  fileInput.click();
+  document.body.removeChild(fileInput);
+});
+
 list.addEventListener("drop", (e) => {
   e.preventDefault();
   const { offsetX, offsetY } = e;
@@ -76,6 +103,7 @@ list.addEventListener("drop", (e) => {
 
     reader.addEventListener("load", () => {
       itemMarkup(file, reader.result, offsetX, offsetY);
+      updateButtonState(); // 이미지 업로드 후 버튼 상태 업데이트
     });
   });
 
@@ -97,7 +125,7 @@ const itemMarkup = (file, url, x, y) => {
       <div class="item-size">SIZE: ${formatBytes(file.size)}</div>
     </div>
     <button class="item-delete" data-id="${id}"></button>
-`;
+  `;
 
   list.append(item);
 
@@ -198,6 +226,7 @@ const deleteItem = (e) => {
   const deletetl = gsap.timeline({
     onComplete: () => {
       parent.remove();
+      updateButtonState(); // 이미지 삭제 후 버튼 상태 업데이트
       const item = document.querySelector(".item");
       if (!item) dragtl.reverse();
     },
@@ -211,3 +240,40 @@ const deleteItem = (e) => {
       "-=.15"
     );
 };
+
+const updateButtonState = () => {
+  const items = document.querySelectorAll(".item");
+  const combinedButton = document.querySelector(".btn-combined");
+  const clearButton = document.querySelector(".btn-clear");
+  if (items.length > 0) {
+    combinedButton.classList.remove("disabled");
+    clearButton.classList.remove("disabled");
+  } else {
+    combinedButton.classList.add("disabled");
+    clearButton.classList.add("disabled");
+  }
+};
+
+document.querySelector(".btn-clear").addEventListener("click", () => {
+  const items = document.querySelectorAll(".item");
+  items.forEach((item) => {
+    const children = item.querySelectorAll(":scope > *");
+
+    const deletetl = gsap.timeline({
+      onComplete: () => {
+        item.remove();
+        updateButtonState(); // 모든 이미지 삭제 후 버튼 상태 업데이트
+        const remainingItem = document.querySelector(".item");
+        if (!remainingItem) dragtl.reverse();
+      },
+    });
+
+    deletetl
+      .to(children, { autoAlpha: 0, y: -10, duration: 0.2, stagger: 0.1 })
+      .to(
+        item,
+        { height: 0, paddingTop: 0, paddingBottom: 0, duration: 0.5 },
+        "-=.15"
+      );
+  });
+});
