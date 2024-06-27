@@ -304,13 +304,16 @@ button {
 }
 
 .btn-upload {
-  background-color: #dbe2ff;
-  color: #4f555f;
+  /* #blue색상을 표현 */
+  background-color: #5c7ae7;
+  color: #ffffff;
+  border: 2px solid #5c7ae7;
   margin-right: 10px;
 }
 
 .btn-upload:hover {
-  background-color: #c4cdfc;
+  background-color: #ffffff;
+  color: #5c71e7;
 }
 
 .btn-upload:active {
@@ -324,12 +327,14 @@ button {
 
 .btn-clear {
   /* clear에 맞는 컬러로 서정 */
-  background-color: #ffdbdb;
-  color: #4f555f;
+  background-color: #ff6b6b;
+  color: #ffffff;
+  border: 2px solid #ff6b6b;
 }
 
 .btn-clear:hover {
-  background-color: #ffbdbd;
+  background-color: #ffffff;
+  color: #ff6b6b;
 }
 
 .btn-clear:active {
@@ -337,20 +342,24 @@ button {
 }
 
 .btn-clear.disabled {
-  background-color: #bac1cb;
+  background-color: #ff6b6b90;
+  border: none;
+  color: #ffffffe0;
   cursor: not-allowed;
   pointer-events: none;
 }
 
 .btn-combined {
   margin-top: 20px;
-  background-color: #f3dbff;
-  color: #4f555f;
+  background-color: #8d5ce7;
+  color: #ffffff;
   width: 100%;
+  border: 2px solid #8d5ce7;
 }
 
 .btn-combined:hover {
-  background-color: #e0c3fc;
+  background-color: #ffffff;
+  color: #8d5ce7;
 }
 
 .btn-combined:active {
@@ -359,6 +368,8 @@ button {
 
 .btn-combined.disabled {
   background-color: #bac1cb;
+  border: none;
+  color: #ffffffe0;
   cursor: not-allowed;
   pointer-events: none;
 }
