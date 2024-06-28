@@ -57,13 +57,13 @@ body {
 }
 
 .list {
-  overflow: auto;
   width: 100%;
   height: 100%;
-  padding: 10px 0;
-  overflow-y: scroll;
+  padding: 8px 0;
   box-sizing: border-box;
   scroll-behavior: smooth;
+  overflow: auto;
+  overflow-y: scroll;
 }
 
 .list::-webkit-scrollbar {
@@ -71,8 +71,20 @@ body {
 }
 
 .list::-webkit-scrollbar-thumb {
-  background-color: #f3dbff;
-  border-radius: 10px;
+  background-color: rgba(95, 66, 66, 0); /* 기본적으로 투명하게 설정 */
+  border-radius: 6px;
+  transition: background-color 0.3s ease; /* 배경색 전환 효과 */
+}
+
+/* thumb 0.3s ease */
+
+.list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.5); /* 마우스를 올렸을 때 색상을 변경 */
+}
+
+.list.scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.5); /* 스크롤할 때 색상을 변경 */
+  transition: background-color 0.3s ease; /* 배경색 전환 효과 */
 }
 
 .droppable.is-over {
@@ -81,7 +93,6 @@ body {
 }
 
 .item {
-  box-sizing: margin-box;
   padding: 10px 10px;
   margin: 4px;
   margin-left: 8px;
@@ -91,7 +102,7 @@ body {
   flex-wrap: wrap;
   align-items: center;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 6px;
 }
 
 .item:first-child {
@@ -299,7 +310,7 @@ button {
   transition: 0.3s;
 
   font-size: 14px;
-  width: 240px;
+  width: 245px;
   height: 50px;
 }
 
