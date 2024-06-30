@@ -4,9 +4,6 @@ const ball = document.querySelector(".ball");
 const filledBall = document.querySelector(".filled-ball");
 const hand = document.querySelector(".hand");
 
-const loader = createLoader();
-document.body.appendChild(loader);
-
 const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -90,39 +87,35 @@ list.addEventListener("drop", (e) => {
   droppable.classList.remove("is-over");
 });
 
-const handleFiles = (files) => {
-  loader.style.display = "block";
-  const filePromises = Array.from(files).map((file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-
-      reader.onload = async (e) => {
-        const resizedImage = await resizeImage(e.target.result);
-        itemMarkup(file, resizedImage);
-        resolve();
-      };
-
-      reader.onerror = (error) => {
-        console.error("File reader error:", error);
-        alert("An error occurred while reading the file.");
-        reject(error);
-      };
-    });
+const handleFiles = async (files) => {
+  const items = Array.from(files).map((file) => itemMarkup(file));
+  updateButtonState();
+  requestAnimationFrame(() => {
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   });
+  for (const [index, file] of Array.from(files).entries()) {
+    await processFile(file, items[index]);
+  }
+};
 
-  Promise.all(filePromises)
-    .then(() => {
-      loader.style.display = "none";
-      updateButtonState();
-      requestAnimationFrame(() => {
-        list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
-      });
-    })
-    .catch((error) => {
-      loader.style.display = "none";
-      console.error("Error processing files:", error);
-    });
+const processFile = (file, item) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      const resizedImage = await resizeImage(e.target.result);
+      updateItemImage(item, resizedImage);
+      resolve();
+    };
+
+    reader.onerror = (error) => {
+      console.error("File reader error:", error);
+      alert("An error occurred while reading the file.");
+      reject(error);
+    };
+
+    reader.readAsDataURL(file);
+  });
 };
 
 const resizeImage = (src) => {
@@ -130,8 +123,8 @@ const resizeImage = (src) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const MAX_WIDTH = 800;
-      const MAX_HEIGHT = 800;
+      const MAX_WIDTH = 150;
+      const MAX_HEIGHT = 150;
       let width = img.width;
       let height = img.height;
 
@@ -170,7 +163,7 @@ const resizeImage = (src) => {
   });
 };
 
-const itemMarkup = (file, url) => {
+const itemMarkup = (file) => {
   const item = document.createElement("div");
   const id = Math.random().toString(36).substr(2, 9);
 
@@ -178,13 +171,13 @@ const itemMarkup = (file, url) => {
   item.setAttribute("id", id);
   item.innerHTML = `
     <div class="item-img">
-      <img src="${url}" loading="lazy" />
+      <div class="spinner" style="display: block;"></div>
     </div>
     <div class="item-details">
       <div class="item-name">${file.name}</div>
       <div class="item-size">SIZE: ${formatBytes(file.size)}</div>
     </div>
-    <button class="item-delete" data-id="${id}"></button>
+    <button class="item-delete" data-id="${id}">Delete</button>
   `;
 
   list.append(item);
@@ -194,12 +187,9 @@ const itemMarkup = (file, url) => {
     deleteItem(e);
   });
 
-  const itemImage = item.querySelector(".item-img");
-
   gsap
     .timeline({
       onComplete: () => {
-        itemImage.style.opacity = 1;
         requestAnimationFrame(() => {
           list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
         });
@@ -207,17 +197,20 @@ const itemMarkup = (file, url) => {
     })
     .set(item, { autoAlpha: 0 })
     .to(item, { autoAlpha: 1, duration: 0.3 })
-    .fromTo(
+    .to(
       item.querySelectorAll(".item-details, .item-delete"),
-      { autoAlpha: 0, y: 20 },
-      { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.1 }
-    )
-    .fromTo(
-      item.querySelector(".item-img img"),
-      { scale: 0.8 },
-      { scale: 1, duration: 0.3 },
+      { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0, scale: 1 },
       "-=0.3"
     );
+
+  return item;
+};
+
+const updateItemImage = (item, url) => {
+  const itemImage = item.querySelector(".item-img");
+  itemImage.innerHTML = `<img src="${url}" loading="lazy" style="max-width: 100%; height: auto;" />`;
+
+  gsap.to(itemImage, { autoAlpha: 1, duration: 0.3 });
 };
 
 const deleteItem = (e) => {
@@ -277,30 +270,20 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
   });
 });
 
-function createLoader() {
-  const loader = document.createElement("div");
-  loader.classList.add("loader");
-  loader.style.position = "fixed";
-  loader.style.top = "50%";
-  loader.style.left = "50%";
-  loader.style.transform = "translate(-50%, -50%)";
-  loader.style.zIndex = "9999";
-  loader.style.display = "none";
-  loader.innerHTML = `
-    <div class="spinner"></div>
-    <style>
-      .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border-top-color: #000;
-        animation: spin 0.8s ease-in-out infinite;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
-  `;
-  return loader;
-}
+// CSS to style the spinner inside each item
+const style = document.createElement("style");
+style.innerHTML = `
+  .spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #000;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    animation: spin 0.8s ease-in-out infinite;
+    display: block;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);

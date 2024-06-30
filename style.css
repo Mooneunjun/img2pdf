@@ -114,15 +114,19 @@ body {
   background-color: #f3dbff;
 }
 
-.item > * {
-  opacity: 0;
-}
+/* .item > * {
+  opacity: 1;
+} */
 
 .item-img {
+  position: relative;
   width: 60px;
   height: 48px;
   border-radius: 4px;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .loaded-image {
