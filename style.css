@@ -71,20 +71,18 @@ body {
 }
 
 .list::-webkit-scrollbar-thumb {
-  background-color: rgba(95, 66, 66, 0); /* 기본적으로 투명하게 설정 */
+  background-color: rgba(95, 66, 66, 0);
   border-radius: 6px;
-  transition: background-color 0.3s ease; /* 배경색 전환 효과 */
+  transition: background-color 0.3s ease;
 }
 
-/* thumb 0.3s ease */
-
 .list::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.5); /* 마우스를 올렸을 때 색상을 변경 */
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .list.scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.5); /* 스크롤할 때 색상을 변경 */
-  transition: background-color 0.3s ease; /* 배경색 전환 효과 */
+  background-color: rgba(0, 0, 0, 0.5);
+  transition: background-color 0.3s ease;
 }
 
 .droppable.is-over {
@@ -97,7 +95,6 @@ body {
   margin: 4px;
   margin-left: 8px;
   margin-right: 0px;
-
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -308,14 +305,12 @@ button {
   border-radius: 8px;
   font-weight: 900;
   transition: 0.3s;
-
   font-size: 14px;
   width: 245px;
   height: 50px;
 }
 
 .btn-upload {
-  /* #blue색상을 표현 */
   background-color: #5c7ae7;
   color: #ffffff;
   border: 2px solid #5c7ae7;
@@ -337,7 +332,6 @@ button {
 }
 
 .btn-clear {
-  /* clear에 맞는 컬러로 서정 */
   background-color: #ff6b6b;
   color: #ffffff;
   border: 2px solid #ff6b6b;

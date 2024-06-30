@@ -4,7 +4,8 @@ const ball = document.querySelector(".ball");
 const filledBall = document.querySelector(".filled-ball");
 const hand = document.querySelector(".hand");
 
-const reader = new FileReader();
+const loader = createLoader();
+document.body.appendChild(loader);
 
 const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 Bytes";
@@ -12,20 +13,20 @@ const formatBytes = (bytes, decimals = 2) => {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-let isDragging = 0;
+let isDraggingCount = 0;
 
 document.addEventListener("dragover", (e) => {
   e.preventDefault();
-  isDragging++;
-  if (isDragging === 1) droppable.classList.add("is-dragging");
+  isDraggingCount++;
+  if (isDraggingCount === 1) droppable.classList.add("is-dragging");
 });
 
 document.addEventListener("drop", (e) => {
   e.preventDefault();
-  isDragging = 0;
+  isDraggingCount = 0;
   droppable.classList.remove("is-dragging");
 });
 
@@ -73,18 +74,7 @@ document.querySelector(".btn-upload").addEventListener("click", () => {
   fileInput.style.display = "none";
 
   fileInput.addEventListener("change", (e) => {
-    const files = e.target.files;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-
-      reader.addEventListener("load", () => {
-        const offsetX = window.innerWidth / 2;
-        const offsetY = window.innerHeight / 2;
-        itemMarkup(file, reader.result, offsetX, offsetY);
-        updateButtonState(); // 이미지 업로드 후 버튼 상태 업데이트
-      });
-    });
+    handleFiles(e.target.files);
   });
 
   document.body.appendChild(fileInput);
@@ -94,23 +84,93 @@ document.querySelector(".btn-upload").addEventListener("click", () => {
 
 list.addEventListener("drop", (e) => {
   e.preventDefault();
-  const { offsetX, offsetY } = e;
   const { files } = e.dataTransfer;
 
-  Array.from(files).forEach((file) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-
-    reader.addEventListener("load", () => {
-      itemMarkup(file, reader.result, offsetX, offsetY);
-      updateButtonState(); // 이미지 업로드 후 버튼 상태 업데이트
-    });
-  });
-
+  handleFiles(files);
   droppable.classList.remove("is-over");
 });
 
-const itemMarkup = (file, url, x, y) => {
+const handleFiles = (files) => {
+  loader.style.display = "block";
+  const filePromises = Array.from(files).map((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onload = async (e) => {
+        const resizedImage = await resizeImage(e.target.result);
+        itemMarkup(file, resizedImage);
+        resolve();
+      };
+
+      reader.onerror = (error) => {
+        console.error("File reader error:", error);
+        alert("An error occurred while reading the file.");
+        reject(error);
+      };
+    });
+  });
+
+  Promise.all(filePromises)
+    .then(() => {
+      loader.style.display = "none";
+      updateButtonState();
+      requestAnimationFrame(() => {
+        list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+      });
+    })
+    .catch((error) => {
+      loader.style.display = "none";
+      console.error("Error processing files:", error);
+    });
+};
+
+const resizeImage = (src) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX_WIDTH = 800;
+      const MAX_HEIGHT = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        },
+        "image/jpeg",
+        0.7
+      );
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+};
+
+const itemMarkup = (file, url) => {
   const item = document.createElement("div");
   const id = Math.random().toString(36).substr(2, 9);
 
@@ -118,7 +178,7 @@ const itemMarkup = (file, url, x, y) => {
   item.setAttribute("id", id);
   item.innerHTML = `
     <div class="item-img">
-      <img src="${url}" />
+      <img src="${url}" loading="lazy" />
     </div>
     <div class="item-details">
       <div class="item-name">${file.name}</div>
@@ -135,88 +195,29 @@ const itemMarkup = (file, url, x, y) => {
   });
 
   const itemImage = item.querySelector(".item-img");
-  const imageLeft = itemImage.offsetLeft;
-  const imageTop = itemImage.offsetTop;
-  const image = document.createElement("div");
 
-  image.classList.add("loaded-image");
-  image.innerHTML = `
-    <img src="${url}" />
-    <span>
-      <svg fill="#fff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 330">
-        <path d="M165 7.5c-8.284 0-15 6.716-15 15v60c0 8.284 6.716 15 15 15 8.284 0 15-6.716 15-15v-60c0-8.284-6.716-15-15-15z"/>
-        <path d="M165 262.5c-8.284 0-15 6.716-15 15v30c0 8.284 6.716 15 15 15 8.284 0 15-6.716 15-15v-30c0-8.284-6.716-15-15-15z"/>
-        <path d="M315 157.5h-60c-8.284 0-15 6.716-15 15s6.716 15 15 15h60c8.284 0 15-6.716 15-15s-6.716-15-15-15z"/>
-        <path d="M90 172.5c0-8.284-6.716-15-15-15H15c-8.284 0-15 6.716-15 15s6.716 15 15 15h60c8.284 0 15-6.716 15-15z"/>
-        <path d="M281.673 55.827c-5.857-5.858-15.355-5.858-21.213 0l-42.427 42.427c-5.858 5.858-5.858 15.355 0 21.213 2.929 2.929 6.768 4.394 10.606 4.394 3.839 0 7.678-1.464 10.607-4.394l42.427-42.427c5.858-5.858 5.858-15.355 0-21.213z"/>
-        <path d="M90.753 225.533L48.328 267.96c-5.857 5.858-5.857 15.355 0 21.213 2.929 2.929 6.768 4.393 10.607 4.393 3.839 0 7.678-1.464 10.607-4.393l42.426-42.427c5.857-5.858 5.857-15.355 0-21.213-5.859-5.858-15.356-5.858-21.215 0z"/>
-        <path d="M69.541 55.827c-5.858-5.858-15.355-5.857-21.213 0-5.858 5.858-5.858 15.355 0 21.213l42.426 42.427c2.93 2.929 6.768 4.394 10.607 4.394 3.838 0 7.678-1.465 10.606-4.393 5.858-5.858 5.858-15.355 0-21.213L69.541 55.827z"/>
-      </svg>
-    </span>
-  `;
-
-  list.append(image);
-  let progress = 0;
-  const tl = gsap.timeline({
-    onComplete: () => {
-      image.remove();
-      itemImage.style.opacity = 1;
-      list.scrollTo(0, list.scrollHeight);
-    },
-  });
-
-  const itemChildren = item.querySelectorAll("*:not(.item-img)");
-  const loadedImg = image.querySelector("img");
-  const loadedSVG = image.querySelector("span");
-  const iLeft = item.offsetLeft;
-  const iTop = item.offsetTop;
-
-  tl.set(droppable, { pointerEvents: "none" })
+  gsap
+    .timeline({
+      onComplete: () => {
+        itemImage.style.opacity = 1;
+        requestAnimationFrame(() => {
+          list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+        });
+      },
+    })
+    .set(item, { autoAlpha: 0 })
+    .to(item, { autoAlpha: 1, duration: 0.3 })
     .fromTo(
-      image,
-      {
-        autoAlpha: 1,
-        width: 20,
-        height: 20,
-        x: x - 10,
-        y: y - 10,
-        borderRadius: "50%",
-      },
-      { duration: 0.1, width: 70, height: 70, x: x - 30, y: y - 30 } // 더욱 줄인 duration
+      item.querySelectorAll(".item-details, .item-delete"),
+      { autoAlpha: 0, y: 20 },
+      { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.1 }
     )
-    .to(loadedSVG, { autoAlpha: 1, duration: 0.1 }, "loading") // 더욱 줄인 duration 값
-    .to(
-      image,
-      {
-        rotation: 720,
-        duration: 0.3, // 더욱 줄인 duration 값
-      },
-      "loading"
-    )
-    .to(loadedSVG, { autoAlpha: 0, duration: 0.1 }) // 더욱 줄인 duration 값
-    .to(loadedImg, { autoAlpha: 1, duration: 0.1 }, "-=.1") // 더욱 줄인 duration 값
-    .to(
-      image,
-      {
-        x: imageLeft,
-        y: imageTop,
-        duration: 0.2, // 더욱 줄인 duration 값
-        autoAlpha: 1,
-        width: 60,
-        height: 48,
-        borderRadius: 4,
-      },
-      "-=.25" // 더욱 줄인 duration 값
-    )
-    .set(itemImage, { autoAlpha: 1 })
     .fromTo(
-      itemChildren,
-      { autoAlpha: 0, y: 30 },
-      { autoAlpha: 1, y: 0, duration: 0.1, stagger: 0.02 } // 더욱 줄인 duration 값
-    )
-
-    .to(image, { autoAlpha: 0, duration: 0.1 }, "-=.1") // 더욱 줄인 duration 값
-    .set(droppable, { pointerEvents: "all" });
+      item.querySelector(".item-img img"),
+      { scale: 0.8 },
+      { scale: 1, duration: 0.3 },
+      "-=0.3"
+    );
 };
 
 const deleteItem = (e) => {
@@ -226,9 +227,8 @@ const deleteItem = (e) => {
   const deletetl = gsap.timeline({
     onComplete: () => {
       parent.remove();
-      updateButtonState(); // 이미지 삭제 후 버튼 상태 업데이트
-      const item = document.querySelector(".item");
-      if (!item) dragtl.reverse();
+      updateButtonState();
+      if (!document.querySelector(".item")) dragtl.reverse();
     },
   });
 
@@ -262,9 +262,8 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
     const deletetl = gsap.timeline({
       onComplete: () => {
         item.remove();
-        updateButtonState(); // 모든 이미지 삭제 후 버튼 상태 업데이트
-        const remainingItem = document.querySelector(".item");
-        if (!remainingItem) dragtl.reverse();
+        updateButtonState();
+        if (!document.querySelector(".item")) dragtl.reverse();
       },
     });
 
@@ -277,3 +276,31 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
       );
   });
 });
+
+function createLoader() {
+  const loader = document.createElement("div");
+  loader.classList.add("loader");
+  loader.style.position = "fixed";
+  loader.style.top = "50%";
+  loader.style.left = "50%";
+  loader.style.transform = "translate(-50%, -50%)";
+  loader.style.zIndex = "9999";
+  loader.style.display = "none";
+  loader.innerHTML = `
+    <div class="spinner"></div>
+    <style>
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-top-color: #000;
+        animation: spin 0.8s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  `;
+  return loader;
+}
