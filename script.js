@@ -67,7 +67,8 @@ document.querySelector(".btn-upload").addEventListener("click", () => {
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.multiple = true;
-  fileInput.accept = "image/*";
+  fileInput.accept = "image/*,application/pdf"; // 이미지 및 PDF 파일만 허용
+
   fileInput.style.display = "none";
 
   fileInput.addEventListener("change", (e) => {
@@ -83,7 +84,19 @@ list.addEventListener("drop", (e) => {
   e.preventDefault();
   const { files } = e.dataTransfer;
 
-  handleFiles(files);
+  // 이미지 및 PDF 파일 필터링
+  const allowedFiles = Array.from(files).filter(
+    (file) => file.type.startsWith("image/") || file.type === "application/pdf"
+  );
+
+  if (allowedFiles.length === 0) {
+    alert("Only image and PDF files are allowed.");
+    dragtl.reverse();
+    droppable.classList.remove("is-over");
+    return;
+  }
+
+  handleFiles(allowedFiles);
   droppable.classList.remove("is-over");
 });
 
@@ -123,8 +136,8 @@ const resizeImage = (src) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const MAX_WIDTH = 150;
-      const MAX_HEIGHT = 150;
+      const MAX_WIDTH = 3000;
+      const MAX_HEIGHT = 3000;
       let width = img.width;
       let height = img.height;
 
