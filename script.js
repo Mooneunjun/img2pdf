@@ -1,8 +1,15 @@
+const { jsPDF } = window.jspdf;
+const pdfjsLib = window["pdfjs-dist/build/pdf"];
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js";
+
 const droppable = document.querySelector(".droppable");
 const list = document.querySelector(".list");
 const ball = document.querySelector(".ball");
 const filledBall = document.querySelector(".filled-ball");
 const hand = document.querySelector(".hand");
+
+const filesArray = []; // 전역 배열로 파일 저장
 
 const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 Bytes";
@@ -101,14 +108,30 @@ list.addEventListener("drop", (e) => {
 });
 
 const handleFiles = async (files) => {
-  const items = Array.from(files).map((file) => itemMarkup(file));
+  const items = Array.from(files).map((file) => {
+    filesArray.push(file); // 파일을 배열에 저장
+    return itemMarkup(file);
+  });
   updateButtonState();
   requestAnimationFrame(() => {
     list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   });
   for (const [index, file] of Array.from(files).entries()) {
-    await processFile(file, items[index]);
+    if (file.type.startsWith("image/")) {
+      await processFile(file, items[index]);
+    } else if (file.type === "application/pdf") {
+      updateItemPdf(file, items[index]); // PDF 파일의 경우 바로 아이콘으로 대체
+    }
   }
+};
+
+const updateItemPdf = (file, item) => {
+  const itemImage = item.querySelector(".item-img");
+  itemImage.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="currentColor" class="bi bi-filetype-pdf" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M14 4.5V14a2 2 0 0 1-2 2h-1v-1h1a1 1 0 0 0 1-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v9H2V2a2 2 0 0 1 2-2h5.5zM1.6 11.85H0v3.999h.791v-1.342h.803q.43 0 .732-.173.305-.175.463-.474a1.4 1.4 0 0 0 .161-.677q0-.375-.158-.677a1.2 1.2 0 0 0-.46-.477q-.3-.18-.732-.179m.545 1.333a.8.8 0 0 1-.085.38.57.57 0 0 1-.238.241.8.8 0 0 1-.375.082H.788V12.48h.66q.327 0 .512.181.185.183.185.522m1.217-1.333v3.999h1.46q.602 0 .998-.237a1.45 1.45 0 0 0 .595-.689q.196-.45.196-1.084 0-.63-.196-1.075a1.43 1.43 0 0 0-.589-.68q-.396-.234-1.005-.234zm.791.645h.563q.371 0 .609.152a.9.9 0 0 1 .354.454q.118.302.118.753a2.3 2.3 0 0 1-.068.592 1.1 1.1 0 0 1-.196.422.8.8 0 0 1-.334.252 1.3 1.3 0 0 1-.483.082h-.563zm3.743 1.763v1.591h-.79V11.85h2.548v.653H7.896v1.117h1.606v.638z"/>
+    </svg>`;
+  gsap.to(itemImage, { autoAlpha: 1, duration: 0.3 });
 };
 
 const processFile = (file, item) => {
@@ -118,7 +141,7 @@ const processFile = (file, item) => {
     reader.onload = async (e) => {
       const resizedImage = await resizeImage(e.target.result);
       updateItemImage(item, resizedImage);
-      resolve();
+      resolve(resizedImage); // 리사이즈된 이미지를 resolve
     };
 
     reader.onerror = (error) => {
@@ -136,8 +159,8 @@ const resizeImage = (src) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const MAX_WIDTH = 3000;
-      const MAX_HEIGHT = 3000;
+      const MAX_WIDTH = 3400; // jsPDF 페이지 크기 제한
+      const MAX_HEIGHT = 3400; // jsPDF 페이지 크기 제한
       let width = img.width;
       let height = img.height;
 
@@ -283,6 +306,97 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
   });
 });
 
+// PDF 변환 및 다운로드 기능 추가
+document.querySelector(".btn-combined").addEventListener("click", async () => {
+  const items = document.querySelectorAll(".item");
+  const pdf = new jsPDF();
+
+  let isFirstPage = true; // 첫 페이지 여부를 확인하기 위한 변수
+
+  for (const [index, item] of items.entries()) {
+    const imgElement = item.querySelector("img");
+    const file = filesArray[index]; // 전역 배열에서 파일 참조
+
+    if (imgElement) {
+      // 이미지 파일 처리
+      const img = new Image();
+      img.src = imgElement.src;
+      await new Promise((resolve) => {
+        img.onload = () => {
+          const imgProps = pdf.getImageProperties(img.src);
+          let pdfWidth = imgProps.width;
+          let pdfHeight = imgProps.height;
+
+          // 크기가 14400을 초과하면 비율을 유지하며 축소
+          if (pdfWidth > 14400 || pdfHeight > 14400) {
+            const ratio = Math.min(14400 / pdfWidth, 14400 / pdfHeight);
+            pdfWidth *= ratio;
+            pdfHeight *= ratio;
+          }
+
+          if (!isFirstPage) {
+            pdf.addPage([pdfWidth, pdfHeight]);
+          } else {
+            pdf.setPage(1); // 첫 페이지 설정
+            pdf.deletePage(1); // 기본 첫 페이지 삭제
+            isFirstPage = false;
+            pdf.addPage([pdfWidth, pdfHeight]);
+          }
+          pdf.addImage(img.src, "JPEG", 0, 0, pdfWidth, pdfHeight);
+          resolve();
+        };
+      });
+    } else if (file) {
+      // PDF 파일 처리
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const typedArray = new Uint8Array(e.target.result);
+        const existingPdf = await pdfjsLib.getDocument({ data: typedArray })
+          .promise;
+        const numPages = existingPdf.numPages;
+
+        for (let i = 1; i <= numPages; i++) {
+          const page = await existingPdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1 });
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d");
+
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          await page.render({ canvasContext: context, viewport: viewport })
+            .promise;
+
+          const imgData = canvas.toDataURL("image/jpeg");
+
+          let pdfWidth = viewport.width;
+          let pdfHeight = viewport.height;
+
+          // 크기가 14400을 초과하면 비율을 유지하며 축소
+          if (pdfWidth > 14400 || pdfHeight > 14400) {
+            const ratio = Math.min(14400 / pdfWidth, 14400 / pdfHeight);
+            pdfWidth *= ratio;
+            pdfHeight *= ratio;
+          }
+
+          if (!isFirstPage) {
+            pdf.addPage([pdfWidth, pdfHeight]);
+          } else {
+            pdf.setPage(1); // 첫 페이지 설정
+            pdf.deletePage(1); // 기본 첫 페이지 삭제
+            isFirstPage = false;
+            pdf.addPage([pdfWidth, pdfHeight]);
+          }
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  }
+
+  pdf.save("combined.pdf");
+});
+
 // CSS to style the spinner inside each item
 const style = document.createElement("style");
 style.innerHTML = `
@@ -290,8 +404,8 @@ style.innerHTML = `
     border: 4px solid rgba(0, 0, 0, 0.1);
     border-top-color: #000;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    width: 26px;
+    height: 26px;
     animation: spin 0.8s ease-in-out infinite;
     display: block;
   }
