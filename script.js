@@ -1,7 +1,4 @@
-const { jsPDF } = window.jspdf;
-const pdfjsLib = window["pdfjs-dist/build/pdf"];
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js";
+// const pdfjsLib = window["pdfjs-dist/build/pdf"];
 
 const droppable = document.querySelector(".droppable");
 const list = document.querySelector(".list");
@@ -307,12 +304,11 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
 });
 
 // PDF 변환 및 다운로드 기능 추가
-
 document.querySelector(".btn-combined").addEventListener("click", async () => {
   const { PDFDocument, rgb } = PDFLib;
   const combinedPdf = await PDFDocument.create();
   const MAX_SIZE = 3400;
-  const MARGIN = 10; // 페이지 간격
+  const MARGIN = 0; // 페이지 간격
 
   const processImage = async (file) => {
     return new Promise((resolve) => {
@@ -352,8 +348,8 @@ document.querySelector(".btn-combined").addEventListener("click", async () => {
       const { dataUrl, width, height } = await processImage(file);
       const img = await combinedPdf.embedJpg(dataUrl);
       const page = combinedPdf.addPage([
-        width + MARGIN * 2,
-        height + MARGIN * 2,
+        width + MARGIN * 0,
+        height + MARGIN * 0,
       ]);
       page.drawImage(img, {
         x: MARGIN,
