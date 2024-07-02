@@ -307,94 +307,80 @@ document.querySelector(".btn-clear").addEventListener("click", () => {
 });
 
 // PDF 변환 및 다운로드 기능 추가
+
 document.querySelector(".btn-combined").addEventListener("click", async () => {
-  const items = document.querySelectorAll(".item");
-  const pdf = new jsPDF();
+  const { PDFDocument, rgb } = PDFLib;
+  const combinedPdf = await PDFDocument.create();
+  const MAX_SIZE = 3400;
+  const MARGIN = 10; // 페이지 간격
 
-  let isFirstPage = true; // 첫 페이지 여부를 확인하기 위한 변수
-
-  for (const [index, item] of items.entries()) {
-    const imgElement = item.querySelector("img");
-    const file = filesArray[index]; // 전역 배열에서 파일 참조
-
-    if (imgElement) {
-      // 이미지 파일 처리
-      const img = new Image();
-      img.src = imgElement.src;
-      await new Promise((resolve) => {
-        img.onload = () => {
-          const imgProps = pdf.getImageProperties(img.src);
-          let pdfWidth = imgProps.width;
-          let pdfHeight = imgProps.height;
-
-          // 크기가 14400을 초과하면 비율을 유지하며 축소
-          if (pdfWidth > 14400 || pdfHeight > 14400) {
-            const ratio = Math.min(14400 / pdfWidth, 14400 / pdfHeight);
-            pdfWidth *= ratio;
-            pdfHeight *= ratio;
-          }
-
-          if (!isFirstPage) {
-            pdf.addPage([pdfWidth, pdfHeight]);
-          } else {
-            pdf.setPage(1); // 첫 페이지 설정
-            pdf.deletePage(1); // 기본 첫 페이지 삭제
-            isFirstPage = false;
-            pdf.addPage([pdfWidth, pdfHeight]);
-          }
-          pdf.addImage(img.src, "JPEG", 0, 0, pdfWidth, pdfHeight);
-          resolve();
-        };
-      });
-    } else if (file) {
-      // PDF 파일 처리
+  const processImage = async (file) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = async (e) => {
-        const typedArray = new Uint8Array(e.target.result);
-        const existingPdf = await pdfjsLib.getDocument({ data: typedArray })
-          .promise;
-        const numPages = existingPdf.numPages;
-
-        for (let i = 1; i <= numPages; i++) {
-          const page = await existingPdf.getPage(i);
-          const viewport = page.getViewport({ scale: 1 });
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
 
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          let width = img.width;
+          let height = img.height;
 
-          await page.render({ canvasContext: context, viewport: viewport })
-            .promise;
+          // 비율에 맞춰 크기 조정
+          const scale = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+          width *= scale;
+          height *= scale;
 
-          const imgData = canvas.toDataURL("image/jpeg");
+          canvas.width = width;
+          canvas.height = height;
+          context.drawImage(img, 0, 0, width, height);
 
-          let pdfWidth = viewport.width;
-          let pdfHeight = viewport.height;
-
-          // 크기가 14400을 초과하면 비율을 유지하며 축소
-          if (pdfWidth > 14400 || pdfHeight > 14400) {
-            const ratio = Math.min(14400 / pdfWidth, 14400 / pdfHeight);
-            pdfWidth *= ratio;
-            pdfHeight *= ratio;
-          }
-
-          if (!isFirstPage) {
-            pdf.addPage([pdfWidth, pdfHeight]);
-          } else {
-            pdf.setPage(1); // 첫 페이지 설정
-            pdf.deletePage(1); // 기본 첫 페이지 삭제
-            isFirstPage = false;
-            pdf.addPage([pdfWidth, pdfHeight]);
-          }
-          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-        }
+          resolve({
+            dataUrl: canvas.toDataURL("image/jpeg"),
+            width: width,
+            height: height,
+          });
+        };
+        img.src = e.target.result;
       };
-      reader.readAsArrayBuffer(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  for (const file of filesArray) {
+    if (file.type.startsWith("image/")) {
+      const { dataUrl, width, height } = await processImage(file);
+      const img = await combinedPdf.embedJpg(dataUrl);
+      const page = combinedPdf.addPage([
+        width + MARGIN * 2,
+        height + MARGIN * 2,
+      ]);
+      page.drawImage(img, {
+        x: MARGIN,
+        y: MARGIN,
+        width: width,
+        height: height,
+      });
+    } else if (file.type === "application/pdf") {
+      const existingPdfBytes = await file.arrayBuffer();
+      const existingPdf = await PDFDocument.load(existingPdfBytes);
+      const copiedPages = await combinedPdf.copyPages(
+        existingPdf,
+        existingPdf.getPageIndices()
+      );
+      copiedPages.forEach((page) => combinedPdf.addPage(page));
     }
   }
 
-  pdf.save("combined.pdf");
+  const pdfBytes = await combinedPdf.save();
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "combined.pdf";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 });
 
 // CSS to style the spinner inside each item
